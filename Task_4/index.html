@@ -1,0 +1,237 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task 4: Complex Validation & Dynamic DOM Routing</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #f1f5f9; margin: 0; padding: 30px; color: #1e293b; }
+    .container { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 30px; }
+    
+    /* Client-Side Routing Styles */
+    nav { display: flex; gap: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; }
+    .nav-btn { background: none; border: none; font-size: 16px; font-weight: 600; color: #64748b; cursor: pointer; padding: 8px 16px; border-radius: 6px; }
+    .nav-btn.active { background: #0284c7; color: #ffffff; }
+    .route-view { display: none; }
+    .route-view.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Form Styles */
+    .form-group { margin-bottom: 18px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    input:focus { outline: none; border-color: #0284c7; }
+
+    /* Password Strength Meter */
+    .meter-container { height: 8px; width: 100%; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+    .meter-bar { height: 100%; width: 0%; transition: width 0.3s ease, background-color 0.3s ease; }
+    .rules-list { list-style: none; padding-left: 0; margin-top: 10px; font-size: 13px; }
+    .rules-list li { margin-bottom: 4px; color: #ef4444; }
+    .rules-list li.valid { color: #16a34a; }
+
+    button.submit-btn { background: #0284c7; color: #fff; border: none; padding: 12px 20px; font-size: 15px; font-weight: 600; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
+    button.submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* Dynamic Feed / User List */
+    .user-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Client-Side Router Tabs -->
+  <nav>
+    <button class="nav-btn active" onclick="navigate('register')">1. Complex Form</button>
+    <button class="nav-btn" onclick="navigate('users')">2. Registered Users (DOM Feed)</button>
+  </nav>
+
+  <!-- Route View 1: Dynamic Form & Validation -->
+  <section id="register" class="route-view active">
+    <h2>Secure User Registration</h2>
+    <p style="color: #64748b; font-size: 14px;">Real-time DOM manipulation evaluates password complexity on every keystroke.</p>
+
+    <form id="complexForm" onsubmit="handleRegistration(event)">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="fullname" placeholder="John Smith" required>
+      </div>
+
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="userEmail" placeholder="john@example.com" required>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Create strong password" oninput="evaluatePasswordStrength()" required>
+        
+        <div class="meter-container">
+          <div id="meterBar" class="meter-bar"></div>
+        </div>
+        <p id="strengthLabel" style="font-size: 13px; font-weight: 600; margin: 5px 0 0 0; color: #64748b;">Strength: Not evaluated</p>
+
+        <ul class="rules-list">
+          <li id="rule-len">• At least 8 characters</li>
+          <li id="rule-upper">• At least one uppercase letter (A-Z)</li>
+          <li id="rule-num">• At least one number (0-9)</li>
+          <li id="rule-spec">• At least one special symbol (@$!%*?&)</li>
+        </ul>
+      </div>
+
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Re-enter password" oninput="checkMatch()" required>
+        <p id="matchLabel" style="font-size: 13px; margin-top: 4px;"></p>
+      </div>
+
+      <button type="submit" id="submitBtn" class="submit-btn" disabled>Register Account</button>
+    </form>
+  </section>
+
+  <!-- Route View 2: Client DOM List / Dashboard -->
+  <section id="users" class="route-view">
+    <h2>Active Registered Accounts</h2>
+    <p style="color: #64748b; font-size: 14px;">Manipulating the DOM tree dynamically from memory without refreshing.</p>
+    <div id="usersList">
+      <p style="color: #94a3b8; font-style: italic;">No users created yet. Return to the form and register one.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+  // In-memory store
+  const state = {
+    users: [],
+    isPasswordValid: false,
+    doPasswordsMatch: false
+  };
+
+  // Client-Side Router Implementation
+  function navigate(viewId) {
+    document.querySelectorAll('.route-view').forEach(view => view.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    document.getElementById(viewId).classList.add('active');
+    event.target.classList.add('active');
+
+    if (viewId === 'users') {
+      renderUsers();
+    }
+  }
+
+  // Complex Password Strength Algorithm & Dynamic DOM updates
+  function evaluatePasswordStrength() {
+    const val = document.getElementById('password').value;
+    const meter = document.getElementById('meterBar');
+    const label = document.getElementById('strengthLabel');
+
+    const checks = {
+      len: val.length >= 8,
+      upper: /[A-Z]/.test(val),
+      num: /[0-9]/.test(val),
+      spec: /[@$!%*?&#]/.test(val)
+    };
+
+    updateRuleDOM('rule-len', checks.len);
+    updateRuleDOM('rule-upper', checks.upper);
+    updateRuleDOM('rule-num', checks.num);
+    updateRuleDOM('rule-spec', checks.spec);
+
+    const score = Object.values(checks).filter(Boolean).length;
+    state.isPasswordValid = (score === 4);
+
+    const levels = [
+      { width: '0%', color: '#e2e8f0', text: 'Strength: Empty' },
+      { width: '25%', color: '#ef4444', text: 'Strength: Weak' },
+      { width: '50%', color: '#f59e0b', text: 'Strength: Fair' },
+      { width: '75%', color: '#3b82f6', text: 'Strength: Good' },
+      { width: '100%', color: '#16a34a', text: 'Strength: Strong (Secure)' }
+    ];
+
+    meter.style.width = levels[score].width;
+    meter.style.backgroundColor = levels[score].color;
+    label.innerText = levels[score].text;
+    label.style.color = levels[score].color;
+
+    checkMatch();
+  }
+
+  function updateRuleDOM(id, isValid) {
+    const el = document.getElementById(id);
+    if (isValid) {
+      el.classList.add('valid');
+    } else {
+      el.classList.remove('valid');
+    }
+  }
+
+  function checkMatch() {
+    const pwd = document.getElementById('password').value;
+    const confirm = document.getElementById('confirmPassword').value;
+    const matchLabel = document.getElementById('matchLabel');
+    const btn = document.getElementById('submitBtn');
+
+    if (!confirm) {
+      matchLabel.innerText = '';
+      state.doPasswordsMatch = false;
+    } else if (pwd === confirm) {
+      matchLabel.innerText = '✓ Passwords match';
+      matchLabel.style.color = '#16a34a';
+      state.doPasswordsMatch = true;
+    } else {
+      matchLabel.innerText = '✕ Passwords do not match';
+      matchLabel.style.color = '#ef4444';
+      state.doPasswordsMatch = false;
+    }
+
+    btn.disabled = !(state.isPasswordValid && state.doPasswordsMatch);
+  }
+
+  // Handle Form Submission and dynamic DOM append
+  function handleRegistration(e) {
+    e.preventDefault();
+    const name = document.getElementById('fullname').value;
+    const email = document.getElementById('userEmail').value;
+
+    state.users.push({
+      id: Date.now(),
+      name,
+      email,
+      joined: new Date().toLocaleTimeString()
+    });
+
+    document.getElementById('complexForm').reset();
+    evaluatePasswordStrength();
+    alert('User registered successfully! Switching to the users dashboard...');
+
+    // Trigger router switch to view 2
+    document.querySelectorAll('.nav-btn')[1].click();
+  }
+
+  // Render DOM tree
+  function renderUsers() {
+    const container = document.getElementById('usersList');
+    if (state.users.length === 0) {
+      container.innerHTML = '<p style="color: #94a3b8; font-style: italic;">No users created yet.</p>';
+      return;
+    }
+
+    container.innerHTML = state.users.map(u => `
+      <div class="user-card" id="user-${u.id}">
+        <div>
+          <strong style="display:block; font-size: 15px;">${u.name}</strong>
+          <span style="color: #64748b; font-size: 13px;">${u.email} • Created: ${u.joined}</span>
+        </div>
+        <button onclick="deleteUser(${u.id})" style="background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Delete</button>
+      </div>
+    `).join('');
+  }
+
+  function deleteUser(id) {
+    state.users = state.users.filter(u => u.id !== id);
+    renderUsers();
+  }
+</script>
+</body>
+</html>

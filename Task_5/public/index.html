@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task 5: RESTful API Integration & Client Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #38bdf8;
+      --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 40px 20px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 820px; }
+
+    header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+    h1 { font-size: 24px; font-weight: 700; color: #fff; }
+    .status-badge { font-size: 13px; color: var(--muted); }
+
+    /* Stats Grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .stat-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-val { font-size: 28px; font-weight: 700; margin-top: 5px; color: var(--primary); }
+
+    /* Action Form */
+    .form-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 30px; display: flex; gap: 12px; }
+    input[type="text"] { flex: 1; background: #0f172a; border: 1px solid var(--border); color: #fff; padding: 12px 16px; border-radius: 6px; font-size: 14px; }
+    input[type="text"]:focus { outline: none; border-color: var(--primary); }
+    select { background: #0f172a; border: 1px solid var(--border); color: #fff; padding: 0 16px; border-radius: 6px; font-size: 14px; }
+    button.btn-primary { background: var(--primary); color: #0f172a; border: none; font-weight: 600; padding: 12px 24px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+    button.btn-primary:hover { opacity: 0.9; }
+
+    /* Item Feed */
+    .task-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .task-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; transition: border-color 0.2s; }
+    .task-card:hover { border-color: #475569; }
+
+    .title-area { display: flex; flex-direction: column; gap: 4px; }
+    .task-title { font-weight: 600; font-size: 15px; }
+    .task-meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+
+    .tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .tag-high, .tag-critical { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
+    .tag-medium { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
+    .tag-low { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
+
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .btn-status { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+    .btn-status:hover { background: #334155; }
+    .btn-status.completed { border-color: var(--success); color: var(--success); }
+    .btn-status.in-progress { border-color: var(--warning); color: var(--warning); }
+    .btn-status.pending { border-color: var(--muted); color: var(--muted); }
+
+    .btn-delete { background: transparent; border: none; color: var(--danger); cursor: pointer; padding: 6px 10px; font-size: 14px; border-radius: 4px; }
+    .btn-delete:hover { background: rgba(248, 113, 113, 0.1); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>RESTful API Operations Console</h1>
+      <div class="status-badge">Task 5: Server-Client Communication</div>
+    </div>
+    <div id="connectionStatus" style="font-size: 12px; color: var(--success);">● REST Service Active</div>
+  </header>
+
+  <!-- Realtime Stats via GET -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Endpoints Hit</div>
+      <div class="stat-val" id="countTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">In Progress</div>
+      <div class="stat-val" style="color: var(--warning);" id="countProgress">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Completed</div>
+      <div class="stat-val" style="color: var(--success);" id="countCompleted">0</div>
+    </div>
+  </div>
+
+  <!-- Create Record (POST) -->
+  <form class="form-card" onsubmit="handleCreate(event)">
+    <input type="text" id="taskInput" placeholder="Define a new project API task..." required>
+    <select id="priorityInput">
+      <option value="Medium">Medium</option>
+      <option value="High">High</option>
+      <option value="Critical">Critical</option>
+    </select>
+    <button type="submit" class="btn-primary">POST Task</button>
+  </form>
+
+  <!-- Items Feed (GET / PUT / DELETE) -->
+  <ul id="taskList" class="task-list"></ul>
+</div>
+
+<script>
+  const API_URL = '/api/tasks';
+
+  // 1. GET: Fetch & update client DOM
+  async function fetchTasks() {
+    try {
+      const res = await fetch(API_URL);
+      const json = await res.json();
+      renderTasks(json.data);
+    } catch (err) {
+      console.error('Fetch error:', err);
+      document.getElementById('connectionStatus').textContent = '● Backend Disconnected';
+      document.getElementById('connectionStatus').style.color = 'var(--danger)';
+    }
+  }
+
+  // 2. POST: Create new record
+  async function handleCreate(e) {
+    e.preventDefault();
+    const input = document.getElementById('taskInput');
+    const priority = document.getElementById('priorityInput').value;
+
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: input.value, priority })
+    });
+
+    if (res.ok) {
+      input.value = '';
+      fetchTasks();
+    }
+  }
+
+  // 3. PUT: Cycle status
+  async function cycleStatus(id) {
+    await fetch(`${API_URL}/${id}`, { method: 'PUT' });
+    fetchTasks();
+  }
+
+  // 4. DELETE: Remove record
+  async function deleteTask(id) {
+    await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+    fetchTasks();
+  }
+
+  // DOM Renderer
+  function renderTasks(tasks) {
+    const list = document.getElementById('taskList');
+    
+    // Update metric counters
+    document.getElementById('countTotal').innerText = tasks.length;
+    document.getElementById('countProgress').innerText = tasks.filter(t => t.status === 'In Progress').length;
+    document.getElementById('countCompleted').innerText = tasks.filter(t => t.status === 'Completed').length;
+
+    if (tasks.length === 0) {
+      list.innerHTML = '<li style="text-align: center; color: var(--muted); padding: 20px;">No items returned from database.</li>';
+      return;
+    }
+
+    list.innerHTML = tasks.map(task => {
+      const statusClass = task.status.toLowerCase().replace(' ', '-');
+      const priorityClass = `tag-${task.priority.toLowerCase()}`;
+
+      return `
+        <li class="task-card">
+          <div class="title-area">
+            <span class="task-title">${escapeHTML(task.title)}</span>
+            <div class="task-meta">
+              <span class="tag ${priorityClass}">${task.priority}</span>
+              <span>• Added at ${task.timestamp}</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button onclick="cycleStatus(${task.id})" class="btn-status ${statusClass}">
+              ${task.status} ↻
+            </button>
+            <button onclick="deleteTask(${task.id})" class="btn-delete" title="Delete Task">✕</button>
+          </div>
+        </li>
+      `;
+    }).join('');
+  }
+
+  function escapeHTML(str) {
+    return str.replace(/[&<>'"]/g, tag => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag]));
+  }
+
+  // Initial load
+  fetchTasks();
+</script>
+</body>
+</html>
